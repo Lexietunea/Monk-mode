@@ -230,6 +230,26 @@
     font-size: 11px; color: var(--text-faint); font-family:'DM Mono', monospace;
     margin: -3px 0 2px;
   }
+  .archive-item{
+    display:block; width:100%; text-align:left;
+    background: var(--surface-2); border:1px solid var(--border); border-radius:10px;
+    padding: 12px 13px; margin: 6px 0; cursor:pointer;
+    transition: border-color .15s;
+  }
+  .archive-item:hover{ border-color: var(--gold); }
+  .archive-item .a-date{
+    font-family:'DM Mono', monospace; font-size: 11px; color: var(--gold);
+    letter-spacing:.04em; margin-bottom: 5px;
+  }
+  .archive-item .a-line{
+    font-size: 13px; color: var(--text-dim); line-height:1.4;
+    display:flex; gap:6px; margin-top:3px;
+  }
+  .archive-item .a-line .a-ic{ flex:0 0 auto; }
+  .archive-item .a-line .a-snip{
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .archive-empty{ color: var(--text-faint); font-size: 13px; padding: 14px 10px; text-align:center; }
 
   /* ---------- Progress ---------- */
   .progress-shell{
@@ -480,6 +500,15 @@
           <div class="journal-hint">Autosaves as you type · private to this browser</div>
         </div>
       </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head">
+        <span class="ic">🗂️</span>
+        <h2>Past entries</h2>
+        <span class="count" id="archiveCount">0</span>
+      </div>
+      <div class="section-body" id="journalArchive"></div>
     </div>
   </div>
 
@@ -935,6 +964,72 @@
     booksEl.value = day.journal.books || '';
     notesEl.oninput = function(){ day.journal.notes = notesEl.value; scheduleSave(); };
     booksEl.oninput = function(){ day.journal.books = booksEl.value; scheduleSave(); };
+    renderJournalArchive();
+  }
+
+  function truncate(str, n){
+    str = (str || '').replace(/\s+/g, ' ').trim();
+    return str.length > n ? str.slice(0, n).trim() + '…' : str;
+  }
+
+  function renderJournalArchive(){
+    var root = document.getElementById('journalArchive');
+    root.innerHTML = '';
+    var upper = Math.min(lastAllowedIdx, ALL_DATES.length - 1);
+    var entries = [];
+    for (var i = upper; i >= 0; i--){
+      if (i === selectedIdx) continue; // already shown above, skip duplicate
+      var key = ALL_DATES[i];
+      var d = data.days[key];
+      if (!d || !d.journal) continue;
+      var hasNotes = (d.journal.notes || '').trim().length > 0;
+      var hasBooks = (d.journal.books || '').trim().length > 0;
+      if (!hasNotes && !hasBooks) continue;
+      entries.push({ idx:i, key:key, notes:d.journal.notes, books:d.journal.books });
+    }
+    document.getElementById('archiveCount').textContent = entries.length;
+
+    if (entries.length === 0){
+      var empty = document.createElement('div');
+      empty.className = 'archive-empty';
+      empty.textContent = "No past entries yet — they'll collect here as you journal.";
+      root.appendChild(empty);
+      return;
+    }
+
+    entries.forEach(function(entry){
+      var item = document.createElement('button');
+      item.type = 'button';
+      item.className = 'archive-item';
+
+      var dateEl = document.createElement('div');
+      dateEl.className = 'a-date';
+      dateEl.textContent = humanDate(entry.key);
+      item.appendChild(dateEl);
+
+      if ((entry.notes || '').trim()){
+        var l1 = document.createElement('div');
+        l1.className = 'a-line';
+        l1.innerHTML = '<span class="a-ic">✍️</span><span class="a-snip"></span>';
+        l1.querySelector('.a-snip').textContent = truncate(entry.notes, 70);
+        item.appendChild(l1);
+      }
+      if ((entry.books || '').trim()){
+        var l2 = document.createElement('div');
+        l2.className = 'a-line';
+        l2.innerHTML = '<span class="a-ic">📖</span><span class="a-snip"></span>';
+        l2.querySelector('.a-snip').textContent = truncate(entry.books, 70);
+        item.appendChild(l2);
+      }
+
+      item.addEventListener('click', function(){
+        selectedIdx = entry.idx;
+        renderAll();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+
+      root.appendChild(item);
+    });
   }
 
   // ---------- Tabs ----------
