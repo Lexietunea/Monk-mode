@@ -207,6 +207,30 @@
   }
   .today-jump button:hover{ border-color: var(--teal); }
 
+  /* ---------- Tabs ---------- */
+  .tabs{
+    display:flex; gap:6px;
+    background: var(--surface); border:1px solid var(--border); border-radius: 999px;
+    padding: 4px; margin-bottom: 18px;
+  }
+  .tab-btn{
+    flex:1; background:none; border:none; color: var(--text-dim);
+    font-family:'Inter',sans-serif; font-size: 13px; font-weight:600;
+    padding: 9px 0; border-radius: 999px; cursor:pointer; transition: all .15s;
+  }
+  .tab-btn.is-active{ background: var(--gold); color:#1b1405; }
+
+  .journal-area{
+    min-height: 160px;
+    resize: vertical;
+    line-height: 1.55;
+    font-family: 'Inter', sans-serif;
+  }
+  .journal-hint{
+    font-size: 11px; color: var(--text-faint); font-family:'DM Mono', monospace;
+    margin: -3px 0 2px;
+  }
+
   /* ---------- Progress ---------- */
   .progress-shell{
     background: var(--surface); border:1px solid var(--border); border-radius: var(--radius);
@@ -379,6 +403,12 @@
     <button id="todayJump">Jump to today</button>
   </div>
 
+  <div class="tabs">
+    <button class="tab-btn is-active" id="tabChecklistBtn" type="button">Checklist</button>
+    <button class="tab-btn" id="tabJournalBtn" type="button">Journal</button>
+  </div>
+
+  <div id="checklistPanel">
   <div class="progress-shell">
     <div class="progress-top">
       <span class="pct-lbl">Today's checklist</span>
@@ -423,6 +453,35 @@
   </div>
 
   <div class="reset-row"><button id="resetDay">Clear this day's checklist</button></div>
+  </div>
+
+  <div id="journalPanel" style="display:none;">
+    <div class="section">
+      <div class="section-head">
+        <span class="ic">✍️</span>
+        <h2>How today went</h2>
+      </div>
+      <div class="section-body">
+        <div class="refl-row">
+          <textarea class="refl-input journal-area" id="journalNotes" placeholder="How did the checklist actually go today? What worked, what slipped, how you felt…" maxlength="4000"></textarea>
+          <div class="journal-hint">Autosaves as you type · private to this browser</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head">
+        <span class="ic">📖</span>
+        <h2>Books & reading</h2>
+      </div>
+      <div class="section-body">
+        <div class="refl-row">
+          <textarea class="refl-input journal-area" id="journalBooks" placeholder="What you read today — title, pages, a quick summary or a line that stuck with you…" maxlength="4000"></textarea>
+          <div class="journal-hint">Autosaves as you type · private to this browser</div>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <footer>
     <div class="credit">Created by <em>Diverse</em></div>
@@ -524,7 +583,8 @@
       creativity: SECTIONS[3].items.map(function(){ return false; }),
       self: SECTIONS[4].items.map(function(){ return false; }),
       bonus: BONUS_ITEMS.map(function(){ return false; }),
-      reflection: { goal1:'', goal2:'', goal3:'', rating:null, gratitude:'' }
+      reflection: { goal1:'', goal2:'', goal3:'', rating:null, gratitude:'' },
+      journal: { notes:'', books:'' }
     };
   }
 
@@ -571,6 +631,7 @@
 
   function getDay(key){
     if (!data.days[key]) data.days[key] = defaultDay();
+    if (!data.days[key].journal) data.days[key].journal = { notes:'', books:'' };
     return data.days[key];
   }
 
@@ -864,13 +925,37 @@
     }
   }
 
-  // ---------- Full render ----------
+  // ---------- Render: journal ----------
+  function renderJournal(){
+    var key = ALL_DATES[selectedIdx];
+    var day = getDay(key);
+    var notesEl = document.getElementById('journalNotes');
+    var booksEl = document.getElementById('journalBooks');
+    notesEl.value = day.journal.notes || '';
+    booksEl.value = day.journal.books || '';
+    notesEl.oninput = function(){ day.journal.notes = notesEl.value; scheduleSave(); };
+    booksEl.oninput = function(){ day.journal.books = booksEl.value; scheduleSave(); };
+  }
+
+  // ---------- Tabs ----------
+  var currentTab = 'checklist';
+  function setTab(tab){
+    currentTab = tab;
+    var isChecklist = tab === 'checklist';
+    document.getElementById('checklistPanel').style.display = isChecklist ? '' : 'none';
+    document.getElementById('journalPanel').style.display = isChecklist ? 'none' : '';
+    document.getElementById('tabChecklistBtn').className = 'tab-btn' + (isChecklist ? ' is-active' : '');
+    document.getElementById('tabJournalBtn').className = 'tab-btn' + (isChecklist ? '' : ' is-active');
+  }
+  document.getElementById('tabChecklistBtn').addEventListener('click', function(){ setTab('checklist'); });
+  document.getElementById('tabJournalBtn').addEventListener('click', function(){ setTab('journal'); });
   function renderAll(){
     renderDayNav();
     renderSections();
     renderProgress();
     renderBonus();
     renderReflection();
+    renderJournal();
     renderChain();
     renderHeaderStats();
   }
@@ -887,8 +972,15 @@
   });
   document.getElementById('resetDay').addEventListener('click', function(){
     var key = ALL_DATES[selectedIdx];
-    if (window.confirm('Clear every box for ' + humanDate(key) + '? This cannot be undone.')){
-      data.days[key] = defaultDay();
+    if (window.confirm('Clear every checkbox for ' + humanDate(key) + '? Your journal and reflection notes are kept. This cannot be undone.')){
+      var day = getDay(key);
+      var fresh = defaultDay();
+      day.study = fresh.study;
+      day.physical = fresh.physical;
+      day.mind = fresh.mind;
+      day.creativity = fresh.creativity;
+      day.self = fresh.self;
+      day.bonus = fresh.bonus;
       scheduleSave();
       renderAll();
     }
